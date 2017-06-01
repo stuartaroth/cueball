@@ -1,6 +1,6 @@
 # cueball
 
-*cueball* is a small abstraction layer for consuming and publishing messages to RabbitMQ. Internally it uses https://github.com/streadway/amqp.
+*cueball* is a small abstraction layer for consuming and publishing messages to RabbitMQ. Internally it uses [github.com/streadway/amqp](https://github.com/streadway/amqp).
 
 ### Installation
 
@@ -12,7 +12,11 @@ $ go get github.com/stuartaroth/cueball
 
 ### Usage
 
+[GoDoc](https://godoc.org/github.com/stuartaroth/cueball)
+
 *cueball* requires clients to implement a simple interface:
+
+[Cueball interface](https://godoc.org/github.com/stuartaroth/cueball#Cueball)
 
 ```go
 type Cueball interface {
@@ -20,15 +24,15 @@ type Cueball interface {
 	Handle(message Message) (map[string]Message, error)
 }
 ```
-`Config` is a struct that contains the RabbitMQ connection information, which includes which queues the program will consume and publish to. 
+[Config](https://godoc.org/github.com/stuartaroth/cueball#Config) is a struct that contains the RabbitMQ connection information, which includes which queues the program will consume and publish to. 
 
-`Handle` is a function that will receive a message from the ConsumerQueue and publish messages to as many queues as desired.
+`Handle` is a function that will receive a message from the ConsumerQueue. It returns a map of string and Message, which which publish a Message to its corresponding string.
 
 For an example of use, see below:
 
 ### Example Usage
 
-You can find this code at https://github.com/stuartaroth/cueball/tree/master/examples/simple-client
+You can find this code at https://github.com/stuartaroth/cueball/blob/master/examples/simple-client/main.go
 
 ```go
 package main
@@ -100,3 +104,7 @@ func main() {
 	cueball.Start(rc)
 }
 ```
+
+### License
+
+BSD-2 clause - see LICENSE for more details

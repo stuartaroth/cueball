@@ -1,16 +1,18 @@
 package cueball
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/streadway/amqp"
 	"log"
 )
 
 // Cueball is the interface that must be implemented to `Start` using this RabbitMQ abstraction.
+//
 // Config() returns a cueball.Config.
+//
 // Handle(message Message) receives a cueball.Message and returns
 // a map[string]cueball.Message and an error.
+//
 // If the error is unequal to nil, the original message will be published to the specified DeadLetterQueue.
 // The map[string]cueball.Message should reflect the string name of the queue the corresponding message
 // should be published to.
@@ -20,22 +22,25 @@ type Cueball interface {
 }
 
 // Config manages the RabbitMQ connection data.
+//
 // The Exchange, ConsumerQueue, PublisherQueues, and DeadLetterQueue are all
 // declared in RabbitMQ if they don't exist.
 type Config struct {
-	Uri             string   `json:"uri"`
-	Exchange        string   `json:"exchange"`
-	ExchangeType    string   `json:"exchangeType"`
-	ConsumerQueue   string   `json:"consumerQueue"`
-	PublisherQueues []string `json:"publisherQueues"`
-	DeadLetterQueue string   `json:"deadLetterQueue"`
-	BindingKey      string   `json:"bindingKey"`
-	ConsumerTag     string   `json:"consumerTag"`
-	Debug           bool     `json:"debug"`
+	Uri             string
+	Exchange        string
+	ExchangeType    string
+	ConsumerQueue   string
+	PublisherQueues []string
+	DeadLetterQueue string
+	BindingKey      string
+	ConsumerTag     string
+	Debug           bool
 }
 
 // Message contains the data from the RabbitMQ message.
+//
 // DeliveryMode can be non-persistent (1) or persistent (2).
+//
 // Priority must be a value in range from (0) to (9).
 type Message struct {
 	ContentType     string
@@ -46,6 +51,7 @@ type Message struct {
 }
 
 // Start requires a struct that implements the `Cueball` interface.
+//
 // It will create the exchanges and queues as needed and then listen forever.
 func Start(cueball Cueball) {
 	publisherChannelConfirmations, err := getPublisherChannelConfirmations(cueball)
@@ -70,7 +76,7 @@ func Start(cueball Cueball) {
 	select {}
 }
 
-var (
+const (
 	DeliveryModeNonPersistent = uint8(1)
 	DeliveryModePersistent    = uint8(2)
 )
@@ -80,8 +86,8 @@ type channelConfirmations struct {
 	Confirmations <-chan amqp.Confirmation
 }
 
-func publishMessageToDeadLetter(message amqp.Delivery, deadLetterChannel *amqp.Channel, deadLetterQueue string) {
-	err := deadLetterChannel.Publish("", deadLetterQueue, false, false, amqp.Publishing{
+func publishMessageToDeadLetter(config Config, message amqp.Delivery, deadLetterChannel *amqp.Channel) {
+	err := deadLetterChannel.Publish("", config.DeadLetterQueue, false, false, amqp.Publishing{
 		Headers:         amqp.Table{},
 		ContentType:     message.ContentType,
 		ContentEncoding: message.ContentEncoding,
@@ -91,10 +97,7 @@ func publishMessageToDeadLetter(message amqp.Delivery, deadLetterChannel *amqp.C
 	})
 	if err != nil {
 		log.Println("Error in deadLetterChannel publish:", err)
-		bits, err := json.Marshal(message)
-		if err == nil {
-			log.Println("Message that failed to publish to deadLetterChannel:", string(bits))
-		}
+		log.Println("Message that failed to publish to deadLetterChannel:", fmt.Sprintf(`{queue='%v', body='%v'}`, config.ConsumerQueue, string(message.Body)))
 	}
 }
 
@@ -124,7 +127,7 @@ func handle(cueball Cueball, messages <-chan amqp.Delivery, publisherChannelConf
 		publishQueueMessages, err := cueball.Handle(convertMessage(message))
 		if err != nil {
 			log.Println("Error in Handle function:", err)
-			publishMessageToDeadLetter(message, deadLetterChannel, config.DeadLetterQueue)
+			publishMessageToDeadLetter(config, message, deadLetterChannel)
 			message.Ack(false)
 			continue
 		}
@@ -155,7 +158,7 @@ func handle(cueball Cueball, messages <-chan amqp.Delivery, publisherChannelConf
 		}
 
 		if publishFailure || ackFailure {
-			publishMessageToDeadLetter(message, deadLetterChannel, config.DeadLetterQueue)
+			publishMessageToDeadLetter(config, message, deadLetterChannel)
 		}
 
 		message.Ack(false)
