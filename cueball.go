@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"github.com/streadway/amqp"
 	"log"
+	"os"
+	"time"
 )
 
 // Cueball is the interface that must be implemented to `Start` using this RabbitMQ abstraction.
@@ -26,15 +28,17 @@ type Cueball interface {
 // The Exchange, ConsumerQueue, PublisherQueues, and DeadLetterQueue are all
 // declared in RabbitMQ if they don't exist.
 type Config struct {
-	Uri             string
-	Exchange        string
-	ExchangeType    string
-	ConsumerQueue   string
-	PublisherQueues []string
-	DeadLetterQueue string
-	BindingKey      string
-	ConsumerTag     string
-	Debug           bool
+	Uri                   string
+	Exchange              string
+	ExchangeType          string
+	ConsumerQueue         string
+	PublisherQueues       []string
+	DeadLetterQueue       string
+	BindingKey            string
+	ConsumerTag           string
+	Debug                 bool
+	ExitAfterEveryMessage bool
+	ExitAfterXMinutesIdle int
 }
 
 // Message contains the data from the RabbitMQ message.
@@ -81,6 +85,11 @@ const (
 	DeliveryModePersistent    = uint8(2)
 )
 
+var (
+	lastActivity                   = time.Now()
+	checkLastActivitySleepDuration = 60 * time.Second
+)
+
 type channelConfirmations struct {
 	Channel       *amqp.Channel
 	Confirmations <-chan amqp.Confirmation
@@ -118,10 +127,49 @@ func printPublishQueueMessages(config Config, messages map[string]Message) {
 	}
 }
 
+func printLastActivity(config Config) {
+	if config.Debug {
+		log.Println("Last Activity:", lastActivity)
+	}
+}
+
+func printExitIdle(config Config) {
+	log.Println(fmt.Sprintf("Exiting due to %v minutes idle", config.ExitAfterXMinutesIdle))
+}
+
+func exit() {
+	os.Exit(0)
+}
+
+func resetLastActivity(config Config) {
+	lastActivity = time.Now()
+	printLastActivity(config)
+}
+
+func checkLastActivity(config Config) {
+	for {
+		minutes := time.Now().Sub(lastActivity).Minutes()
+		if minutes > float64(config.ExitAfterXMinutesIdle) {
+			printExitIdle(config)
+			exit()
+		}
+
+		time.Sleep(checkLastActivitySleepDuration)
+	}
+}
+
 func handle(cueball Cueball, messages <-chan amqp.Delivery, publisherChannelConfirmations map[string]channelConfirmations, deadLetterChannel *amqp.Channel) {
 	config := cueball.Config()
 
+	resetLastActivity(config)
+
+	if config.ExitAfterXMinutesIdle > 0 {
+		go checkLastActivity(config)
+
+	}
+
 	for message := range messages {
+		resetLastActivity(config)
 		printMessage(config, message)
 
 		publishQueueMessages, err := cueball.Handle(convertMessage(message))
@@ -162,6 +210,9 @@ func handle(cueball Cueball, messages <-chan amqp.Delivery, publisherChannelConf
 		}
 
 		message.Ack(false)
+		if config.ExitAfterEveryMessage {
+			exit()
+		}
 	}
 }
 

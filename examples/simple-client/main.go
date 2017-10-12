@@ -28,6 +28,8 @@ func (rc CueballClient) Config() cueball.Config {
 		BindingKey:      "simple-cueball-key",
 		ConsumerTag:     "simple-consumer",
 		Debug:           true,
+		ExitAfterEveryMessage: false,
+		ExitAfterXMinutesIdle: 1,
 	}
 }
 
