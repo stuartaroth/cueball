@@ -39,6 +39,7 @@ type Config struct {
 	Debug                 bool
 	ExitAfterEveryMessage bool
 	ExitAfterXMinutesIdle int
+	QueueArguments        map[string]interface{}
 }
 
 // Message contains the data from the RabbitMQ message.
@@ -258,7 +259,7 @@ func getMessages(cueball Cueball) (<-chan amqp.Delivery, error) {
 		false,
 		false,
 		false,
-		nil,
+		config.QueueArguments,
 	)
 	if err != nil {
 		return nil, err
@@ -326,7 +327,7 @@ func getPublisherChannelConfirmations(cueball Cueball) (map[string]channelConfir
 			false,
 			false,
 			false,
-			nil,
+			config.QueueArguments,
 		)
 		if err != nil {
 			return mappy, err
@@ -377,7 +378,7 @@ func getDeadLetterChannel(cueball Cueball) (*amqp.Channel, error) {
 		false,
 		false,
 		false,
-		nil,
+		config.QueueArguments,
 	)
 	if err != nil {
 		return nil, err
