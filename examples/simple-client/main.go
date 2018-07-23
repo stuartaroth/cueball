@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"github.com/stuartaroth/cueball"
+	"time"
 )
 
 var (
@@ -60,6 +61,8 @@ func (rc CueballClient) Handle(message cueball.Message) (map[string]cueball.Mess
 		HelloQueue:   helloMessage,
 		GoodbyeQueue: goodbyeMessage,
 	}
+
+	time.Sleep(5 * time.Second)
 
 	return publishQueueMessages, nil
 }

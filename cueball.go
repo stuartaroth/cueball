@@ -253,6 +253,11 @@ func getMessages(cueball Cueball) (<-chan amqp.Delivery, error) {
 		return nil, err
 	}
 
+	err = channel.Qos(1, 0, true)
+	if err != nil {
+		return nil, err
+	}
+
 	queue, err := channel.QueueDeclare(
 		config.ConsumerQueue,
 		true,
